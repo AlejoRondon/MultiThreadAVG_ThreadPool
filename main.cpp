@@ -41,13 +41,13 @@ Considerations
 
 #include "ThreadPool.h"
 
-#define ARRAY_LENGTH  1000000
+#define ARRAY_LENGTH  10000000
 
 //----------------------------------- GLOBAL VARIABLES --------------------------------------------------
 long long total_sum = 0;
 std::mutex myMutex; //[5]
 unsigned int nthreads = std::thread::hardware_concurrency(); //[2] Getting amount of proccesors
-
+unsigned int ntasks = 20;
 //------------------------------   FUNCTION DECLARATIONS   ----------------------------------------------
 
 // [5] Function to create an array filled with random <int> numbers
@@ -57,7 +57,7 @@ int* create_random_data_array(int n, int min_number = 0, int max_number = 100) {
 
   std::mt19937 engine;
   std::uniform_int_distribution<> uniformDist(min_number, max_number);
-  for(long long i = 0 ; i < n ; ++i) randValues.push_back(uniformDist(engine));
+  for (long long i = 0; i < n; ++i) randValues.push_back(uniformDist(engine));
 
   //Adapting original function from [5] to return an array instead of vector type(Dynamic array https://stackoverflow.com/questions/4029870/how-to-create-a-dynamic-array-of-integers)
   int* arr = new int[n];
@@ -67,7 +67,7 @@ int* create_random_data_array(int n, int min_number = 0, int max_number = 100) {
   return arr;
 }
 
-long long sumArr(int * arr, int start, int stop) {
+long long sumArr(int* arr, int start, int stop) {
   return std::accumulate(arr + start, arr + stop, 0); //discovered way[4]
 
   //Classical way ...
@@ -85,7 +85,7 @@ void sumArr2(int* arr, int start, int end) {
 
 //-----------------------------------------   MAIN   -----------------------------------------------
 int main() {
-    
+
   //Creating a random array
   int* arr = create_random_data_array(ARRAY_LENGTH, 0, 1000);
 
@@ -108,10 +108,10 @@ int main() {
   //----------------------------------------------------------------------------------------
   //https://stackoverflow.com/questions/33769812/retrieving-values-from-array-of-future-objects-stdvector
   std::vector<std::future<long long>> partial_result;
-  for(int i = 0; i < nthreads; i++) {
-    partial_result.push_back(std::async(&sumArr, arr, i * ARRAY_LENGTH / nthreads, (i + 1)* ARRAY_LENGTH / nthreads));
+  for (int i = 0; i < nthreads; i++) {
+    partial_result.push_back(std::async(&sumArr, arr, i * ARRAY_LENGTH / nthreads, (i + 1) * ARRAY_LENGTH / nthreads));
   }
-  for(auto& fut : partial_result) {
+  for (auto& fut : partial_result) {
     total_sum += fut.get();
   }
   //----------------------------------------------------------------------------------------
@@ -123,9 +123,9 @@ int main() {
   total_sum = 0;
   t1 = std::chrono::high_resolution_clock::now();
   //----------------------------------------------------------------------------------------
-  std::thread *threads[nthreads];
-  for(int j = 0; j < nthreads; j ++) threads[j] = new std::thread(sumArr2, arr, j * ARRAY_LENGTH / nthreads, (j + 1)*ARRAY_LENGTH / nthreads);
-  for(int j = 0; j < nthreads; j ++)(*threads[j]).join();
+  std::thread* threads[nthreads];
+  for (int j = 0; j < nthreads; j++) threads[j] = new std::thread(sumArr2, arr, j * ARRAY_LENGTH / nthreads, (j + 1) * ARRAY_LENGTH / nthreads);
+  for (int j = 0; j < nthreads; j++)(*threads[j]).join();
   //----------------------------------------------------------------------------------------
   t2 = std::chrono::high_resolution_clock::now();
   duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();   //to uS convertion
@@ -135,25 +135,25 @@ int main() {
   //***********************************************************************THREAD POOL WAY(3nd APPROACH)
 
   t1 = std::chrono::high_resolution_clock::now();
-  ThreadPool pool(nthreads+1);
-  t2 = std::chrono::high_resolution_clock::now();  
-  duration = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count();   //to uS convertion
-  std::cout << "Threadpool creation lapse: " << duration << " nanoseconds " << std::endl;
+  ThreadPool pool(nthreads);
+  t2 = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();   //to uS convertion
+  std::cout << "Threadpool creation lapse: " << duration << " microseconds " << std::endl;
 
   total_sum = 0;
   t1 = std::chrono::high_resolution_clock::now();
-  std::vector< std::future<long long> > results;  
-  for(int j = 0; j < nthreads; ++j) {
-      results.emplace_back(
-          pool.enqueue(&sumArr, arr, j* ARRAY_LENGTH / nthreads, (j + 1)* ARRAY_LENGTH / nthreads)
-      );
-  }  
-  for(auto && result: results)
-  total_sum += result.get();
+  std::vector< std::future<long long> > results;
+  for (int j = 0; j < ntasks; ++j) {
+    results.emplace_back(
+      pool.enqueue(&sumArr, arr, j * ARRAY_LENGTH / ntasks, (j + 1) * ARRAY_LENGTH / ntasks)
+    );
+  }
+  for (auto&& result : results)
+    total_sum += result.get();
 
   t2 = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count();   //to uS convertion
-  std::cout << "Threadpool(3) total:" << total_sum << ", Execution lapse: " << duration << " nanoseconds " << std::endl;
+  duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();   //to uS convertion
+  std::cout << "Threadpool(3) total:" << total_sum << ", Execution lapse: " << duration << " microseconds " << std::endl;
 
 
   total_sum = 0;
@@ -161,17 +161,17 @@ int main() {
   // std::vector< std::future<long long> > results2; 
   t1 = std::chrono::high_resolution_clock::now();
   // std::vector< std::future<long long> > results;  
-  for(int j = 0; j < nthreads; ++j) {
-      results.emplace_back(
-          pool.enqueue(&sumArr, arr, j* ARRAY_LENGTH / nthreads, (j + 1)* ARRAY_LENGTH / nthreads)
-      );
-  }  
-  for(auto && result: results)
-  total_sum += result.get();
+  for (int j = 0; j < ntasks; ++j) {
+    results.emplace_back(
+      pool.enqueue(&sumArr, arr, j * ARRAY_LENGTH / ntasks, (j + 1) * ARRAY_LENGTH / ntasks)
+    );
+  }
+  for (auto&& result : results)
+    total_sum += result.get();
 
   t2 = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count();   //to uS convertion
-  std::cout << "Threadpool(4) total:" << total_sum << ", Execution lapse: " << duration << " nanoseconds " << std::endl;
+  duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();   //to uS convertion
+  std::cout << "Threadpool(4) total:" << total_sum << ", Execution lapse: " << duration << " microseconds " << std::endl;
 
   //***************************************       RESULT  ***********************************************
 
@@ -180,21 +180,20 @@ int main() {
   do {
     std::cout << "Do you want to print all vector values? y:yes(values and average) / n:no(only average)" << std::endl;
     std::cin >> user_answer;
-  } while(user_answer != 'y' && user_answer != 'n');
+  } while (user_answer != 'y' && user_answer != 'n');
 
-  if(user_answer == 'y') {
+  if (user_answer == 'y') {
     std::cout << "arr[" << ARRAY_LENGTH << "] = {";
-    for(int i = 0; i < ARRAY_LENGTH; i++) {
+    for (int i = 0; i < ARRAY_LENGTH; i++) {
       std::cout << arr[i] << ((i != ARRAY_LENGTH - 1) ? "," : "} | ");
     }
   } else {
     std::cout << "arr[" << ARRAY_LENGTH << "] = {...} | ";
   }
   std::cout << "average: " << total_sum / ARRAY_LENGTH << std::endl;
-
-  delete arr; //freeing up memory
-  pthread_exit(nullptr);
-  return 0;
+  return(0);
+  // delete arr; //freeing up memory
+  // pthread_exit(nullptr);
 }
 
 
